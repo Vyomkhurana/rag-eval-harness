@@ -1,0 +1,4 @@
+Title: Multi-Factor Authentication (MFA) Issues
+Category: Account Access
+
+If MFA codes are consistently rejected even though they are entered correctly, the most common cause is clock drift between your phone and the authentication server. The authenticator app allows a time-drift tolerance of up to 30 seconds; if your device clock has drifted beyond that window, codes will fail. Enable "Set time automatically" in your phone's date and time settings to correct this. If you have lost your MFA device entirely, contact the IT helpdesk to have MFA temporarily reset after identity verification through your manager.

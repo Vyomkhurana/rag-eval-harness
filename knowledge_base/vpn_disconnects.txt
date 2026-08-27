@@ -1,0 +1,4 @@
+Title: VPN Randomly Disconnects
+Category: Network Access
+
+Frequent VPN disconnects are often caused by switching between WiFi networks, laptop sleep/wake cycles, or an unstable home internet connection. Disable "Sleep on lid close" while connected to VPN for long sessions, and prefer a wired connection when performing large file transfers. If disconnects happen at a consistent time, check for a scheduled network adapter power-saving setting under Device Manager > Network Adapters > Power Management, and disable "Allow the computer to turn off this device to save power." Persistent disconnects lasting more than a day should be reported to IT with the approximate disconnect time.

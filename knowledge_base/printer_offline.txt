@@ -1,0 +1,4 @@
+Title: Printer Offline Troubleshooting
+Category: Hardware
+
+If a network printer shows as offline, first check that the printer's power and network cable (or WiFi light) are on. On Windows, open Settings > Printers & Scanners, select the printer, and click "Open Queue," then clear any stuck print jobs. Restart the print spooler service if the queue is unresponsive. If the printer is still offline, try removing it and re-adding it using the printer's IP address, which can be found on the printer's own display panel under Network Settings. Most offline issues resolve after a spooler restart or printer reboot.

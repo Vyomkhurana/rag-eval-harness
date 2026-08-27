@@ -1,0 +1,4 @@
+Title: Zoom Audio Issues
+Category: Software
+
+If other meeting participants cannot hear you in Zoom, first check that the correct microphone is selected under Settings > Audio, and that the input level meter moves when you speak. Confirm the microphone is not muted at the OS level as well as within Zoom. If using a USB headset, try unplugging and reconnecting it, since Zoom sometimes caches a stale device list. For persistent audio dropouts during calls, disable Bluetooth on the laptop unless the headset itself is Bluetooth, as WiFi and Bluetooth interference can cause audio glitches.

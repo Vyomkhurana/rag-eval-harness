@@ -1,0 +1,4 @@
+Title: Ticket Priority Levels and Response Times
+Category: IT Service Desk
+
+Support tickets are classified into four priority levels. Priority 1 (Critical, e.g. full outage affecting many users) has a target first response time of 30 minutes and is worked around the clock. Priority 2 (High, e.g. one user fully unable to work) has a target first response time of 4 business hours. Priority 3 (Medium, e.g. a non-blocking issue with a workaround) has a target first response time of 1 business day. Priority 4 (Low, e.g. general questions or minor requests) has a target first response time of 3 business days. Priority is set by the service desk based on business impact, not by the submitter.

@@ -1,0 +1,4 @@
+Title: Email Sync Issues
+Category: Software
+
+If Outlook stops syncing new emails, first check your internet connection and confirm the account shows as "Connected" in the bottom status bar. Try File > Account Settings > Repair to let Outlook attempt an automatic repair. If that fails, remove the account and re-add it using your standard network credentials; mail should resync within a few minutes for the last 30 days of history. On mobile devices, removing and re-adding the corporate email profile through the Mail app settings usually resolves sync delays.

@@ -1,0 +1,4 @@
+Title: VPN Setup Guide
+Category: Network Access
+
+To set up VPN access on a company laptop, install the GlobalProtect client from the internal software portal. Launch the client and enter the gateway address vpn.company.local. Log in with your standard network username and password, then approve the MFA push notification on your phone. If you do not see a push notification within 30 seconds, open the authenticator app and enter the 6-digit code manually. Once connected, you should see a green connected icon in the system tray. Contact IT if the client fails to install or the gateway address is unreachable.

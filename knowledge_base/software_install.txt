@@ -1,0 +1,4 @@
+Title: Requesting New Software Installation
+Category: Software
+
+Employees who need software not already available in the Company Software Center must submit a request through the IT Service Portal under "Software Request." Include the software name, version, and a business justification. Requests for software that costs money require manager approval, which is routed automatically. Standard requests are typically fulfilled within 2 business days; requests involving new vendor licensing can take up to 5 business days for procurement and security review.

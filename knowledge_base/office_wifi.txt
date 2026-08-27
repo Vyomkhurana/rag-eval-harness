@@ -1,0 +1,4 @@
+Title: Connecting to Office WiFi
+Category: Network Access
+
+The office wireless network "CorpNet-Secure" uses WPA2-Enterprise authentication. Connect using your standard network username and password; no separate WiFi password is issued. Guest devices should use the "CorpNet-Guest" network, which requires a temporary code issued at reception and expires after 24 hours. If a company laptop repeatedly fails to connect to CorpNet-Secure, forget the network in WiFi settings and reconnect to force it to re-download the security certificate.

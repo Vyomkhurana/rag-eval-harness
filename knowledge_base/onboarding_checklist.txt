@@ -1,0 +1,4 @@
+Title: New Employee Onboarding Checklist
+Category: Onboarding
+
+New hires are provisioned automatically once HR submits the start date, including a network account, corporate email, and a laptop shipped to the employee's address or ready at the office desk. On day one, employees should log in with the temporary credentials emailed to their personal address, set a permanent password, and enroll in MFA using the company authenticator app. Access to team-specific shared drives and applications should be requested by the new hire's manager during the first week using the Access Request process.

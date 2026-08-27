@@ -1,0 +1,4 @@
+Title: Requesting Shared Drive Access
+Category: Account Access
+
+Access to shared network drives and SharePoint folders must be requested through the IT Service Portal under "Access Request." Select the specific drive or folder path and provide a business reason; the request is routed to the folder owner for approval before IT provisions access. Standard access requests are typically completed within 1 business day of manager and folder-owner approval. Emergency access for time-sensitive business needs can be escalated by marking the request as urgent, which notifies the approver directly.

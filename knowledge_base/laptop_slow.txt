@@ -1,0 +1,4 @@
+Title: Laptop Running Slow
+Category: Hardware
+
+A slow laptop is usually caused by too many background applications or a pending update. Open Task Manager and check for processes using high CPU or memory, and close unnecessary applications. Check Windows Update for pending updates, since installations queued in the background can consume resources. Clearing the browser cache and temporary files can also help. If the laptop is more than 4 years old and still slow after these steps, submit a hardware refresh request through the IT portal.
