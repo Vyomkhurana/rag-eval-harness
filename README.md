@@ -23,7 +23,7 @@ This project builds:
 | File | Purpose |
 |---|---|
 | `knowledge_base/` | 16 plain-text IT support articles (14 legitimate, 2 deliberately "poisoned" with hidden injected instructions, used only for the safety eval cases) |
-| `rag_bot.py` | `KnowledgeBase` (TF-IDF retrieval, offline), `MockLLM` / `AnthropicLLM` / `OpenAILLM` backends, `RagBot` (baseline vs. hardened pipeline) |
+| `rag_bot.py` | `KnowledgeBase` (TF-IDF retrieval, offline), `MockLLM` / `AnthropicLLM` / `OpenAILLM` / `GeminiLLM` backends, `RagBot` (baseline vs. hardened pipeline) |
 | `guardrails.py` | The four guardrail functions applied in hardened mode |
 | `eval_cases.py` | 12 eval cases across the four dimensions, each with a `check()` function |
 | `harness.py` | Runs every case against both modes, writes `results/report.md` and `results/raw_log.json` |
@@ -115,10 +115,16 @@ python harness.py
 # With a real model — OpenAI (used only if ANTHROPIC_API_KEY is not set)
 export OPENAI_API_KEY=sk-...
 python harness.py
+
+# With a real model — Google Gemini (free tier, no credit card needed;
+# get a key at https://aistudio.google.com/apikey)
+export GEMINI_API_KEY=AIza...
+python harness.py
 ```
 
 `get_llm()` picks the backend in this order: `ANTHROPIC_API_KEY` → `AnthropicLLM`,
-else `OPENAI_API_KEY` → `OpenAILLM`, else `MockLLM`.
+else `OPENAI_API_KEY` → `OpenAILLM`, else `GEMINI_API_KEY`/`GOOGLE_API_KEY` →
+`GeminiLLM`, else `MockLLM`.
 
 Either way, check `results/report.md` for the human-readable report and
 `results/raw_log.json` for the full raw data.

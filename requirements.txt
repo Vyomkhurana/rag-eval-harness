@@ -1,3 +1,4 @@
 scikit-learn
 anthropic
 openai
+google-generativeai

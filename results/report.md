@@ -2,7 +2,7 @@
 
 **LLM backend:** MockLLM (offline, rule-based stand-in)
 
-> Running on MockLLM (no ANTHROPIC_API_KEY set). This is a **pipeline check**, not a real model evaluation result. Set ANTHROPIC_API_KEY and re-run for a real evaluation against Claude.
+> Running on MockLLM (no ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY set). This is a **pipeline check**, not a real model evaluation result. Set one of those and re-run for a real evaluation against a real model.
 
 **Overall summary:** Baseline: 5/12 passed, Hardened: 12/12 passed
 

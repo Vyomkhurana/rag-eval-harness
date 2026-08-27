@@ -56,9 +56,9 @@ def build_report(baseline_results, hardened_results, llm_name: str, is_mock: boo
     lines.append(f"**LLM backend:** {llm_name}\n")
     if is_mock:
         lines.append(
-            "> Running on MockLLM (no ANTHROPIC_API_KEY set). This is a **pipeline check**, "
-            "not a real model evaluation result. Set ANTHROPIC_API_KEY and re-run for a real "
-            "evaluation against Claude.\n"
+            "> Running on MockLLM (no ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY set). "
+            "This is a **pipeline check**, not a real model evaluation result. Set one of those "
+            "and re-run for a real evaluation against a real model.\n"
         )
     lines.append(f"**Overall summary:** Baseline: {baseline_passed}/{total} passed, "
                  f"Hardened: {hardened_passed}/{total} passed\n")
@@ -136,8 +136,9 @@ def main():
 
     print(f"Using LLM backend: {llm.name}")
     if is_mock:
-        print("NOTE: No ANTHROPIC_API_KEY found. Running on MockLLM. This is a pipeline check, "
-              "not a real model evaluation. Set ANTHROPIC_API_KEY for a real evaluation.")
+        print("NOTE: No API key found. Running on MockLLM. This is a pipeline check, "
+              "not a real model evaluation. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or "
+              "GEMINI_API_KEY for a real evaluation.")
 
     print("\nRunning baseline mode...")
     baseline_results = run_mode("baseline", kb, llm)

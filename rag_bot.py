@@ -186,11 +186,33 @@ class OpenAILLM:
         return response.choices[0].message.content or ""
 
 
+class GeminiLLM:
+    """Real backend using the Google Gemini API (free tier via Google AI Studio)."""
+
+    name = "GeminiLLM (gemini-2.0-flash)"
+
+    def __init__(self, model: str = "gemini-2.0-flash"):
+        import google.generativeai as genai
+
+        api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        genai.configure(api_key=api_key)
+        self._genai = genai
+        self.model_name = model
+
+    def generate(self, system_prompt: str, context: str, query: str, has_confident_match: bool) -> str:
+        model = self._genai.GenerativeModel(self.model_name, system_instruction=system_prompt)
+        user_message = f"Knowledge base context:\n{context}\n\nQuestion: {query}"
+        response = model.generate_content(user_message)
+        return response.text or ""
+
+
 def get_llm():
     if os.environ.get("ANTHROPIC_API_KEY"):
         return AnthropicLLM()
     if os.environ.get("OPENAI_API_KEY"):
         return OpenAILLM()
+    if os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
+        return GeminiLLM()
     return MockLLM()
 
 
