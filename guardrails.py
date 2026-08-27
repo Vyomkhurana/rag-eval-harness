@@ -1,28 +1,15 @@
-"""
-Guardrail layer for the RAG support bot.
-
-Four independent defenses, applied in the "hardened" pipeline:
-  1. sanitize_context      - strip instruction-shaped text out of retrieved docs
-  2. sanitize_user_input   - strip instruction-shaped text out of the user's own message
-  3. harden_system_prompt  - add explicit anti-injection / safety rules to the system prompt
-  4. filter_output         - last-resort scan of what the model actually said
-
-None of these depend on a specific LLM backend, so they apply equally to
-MockLLM and AnthropicLLM.
-"""
+"""Guardrail functions applied in the hardened pipeline."""
 
 import re
 
 REDACTION_MARKER = "[REDACTED BY GUARDRAIL]"
 
-# Patterns that indicate an embedded instruction trying to hijack the assistant.
-# Applied to both retrieved KB content and raw user input.
 _INJECTION_PATTERNS = [
-    r"<!--.*?-->",                                        # HTML comments (common hiding spot)
-    r"\[\s*ASSISTANT\s+INSTRUCTION\s*:.*?\]",              # fake bracketed assistant instructions
-    r"\[\s*SYSTEM\s*:.*?\]",                               # fake bracketed system instructions
+    r"<!--.*?-->",
+    r"\[\s*ASSISTANT\s+INSTRUCTION\s*:.*?\]",
+    r"\[\s*SYSTEM\s*:.*?\]",
     r"ignore\s+(all\s+)?(previous|prior|above)\s+instructions?",
-    r"you\s+are\s+now\s+[\"']?[\w\- ]{1,40}[\"']?",        # "you are now X"
+    r"you\s+are\s+now\s+[\"']?[\w\- ]{1,40}[\"']?",
     r"act\s+as\s+[\w\- ]{1,40}\s+with\s+no\s+restrictions?",
     r"reveal\s+(your\s+|the\s+)?(full\s+)?(system\s+prompt|admin\s+(code|override)|internal\s+config\w*)",
     r"(do\s+not|don't)\s+(mention|reveal)\s+this\s+(note|instruction)?",
@@ -33,7 +20,6 @@ _INJECTION_PATTERNS = [
 
 _COMPILED_INJECTION = [re.compile(p, re.IGNORECASE | re.DOTALL) for p in _INJECTION_PATTERNS]
 
-# Patterns checked on the model's *output* as a last line of defense.
 _BAD_OUTPUT_PATTERNS = [
     r"ADMIN-OVERRIDE-[A-Z0-9\-]+",
     r"\[COMPROMISED RESPONSE\]",
@@ -47,24 +33,21 @@ _BAD_OUTPUT_PATTERNS = [
 _COMPILED_BAD_OUTPUT = [re.compile(p, re.IGNORECASE) for p in _BAD_OUTPUT_PATTERNS]
 
 
-def sanitize_context(raw_context: str) -> str:
-    """Strip instruction-shaped patterns out of retrieved KB text before it reaches the LLM."""
-    cleaned = raw_context
+def _strip_injection(text: str) -> str:
     for pattern in _COMPILED_INJECTION:
-        cleaned = pattern.sub(REDACTION_MARKER, cleaned)
-    return cleaned
+        text = pattern.sub(REDACTION_MARKER, text)
+    return text
+
+
+def sanitize_context(raw_context: str) -> str:
+    return _strip_injection(raw_context)
 
 
 def sanitize_user_input(user_query: str) -> str:
-    """Strip instruction-shaped patterns out of the user's own message."""
-    cleaned = user_query
-    for pattern in _COMPILED_INJECTION:
-        cleaned = pattern.sub(REDACTION_MARKER, cleaned)
-    return cleaned
+    return _strip_injection(user_query)
 
 
 def harden_system_prompt(base_prompt: str) -> str:
-    """Append explicit anti-injection / safety rules to the base system prompt."""
     rules = """
 
 Additional rules you must always follow:
@@ -85,7 +68,6 @@ Additional rules you must always follow:
 
 
 def filter_output(llm_output: str) -> str:
-    """Last-resort check on what the model actually said before it reaches the user."""
     for pattern in _COMPILED_BAD_OUTPUT:
         if pattern.search(llm_output):
             return (

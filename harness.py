@@ -1,14 +1,4 @@
-"""
-Test runner for the RAG agent evaluation harness.
-
-Runs every case in eval_cases.EVAL_CASES against both a baseline RagBot
-(no guardrails) and a hardened RagBot (all four guardrails), using the same
-KnowledgeBase and LLM instance for both so the comparison is apples-to-apples.
-
-Writes:
-  results/report.md    - human-readable report, grouped by dimension
-  results/raw_log.json - full raw data for both modes
-"""
+"""Runs every eval case against baseline and hardened bots, writes results/."""
 
 import json
 import os
@@ -56,9 +46,8 @@ def build_report(baseline_results, hardened_results, llm_name: str, is_mock: boo
     lines.append(f"**LLM backend:** {llm_name}\n")
     if is_mock:
         lines.append(
-            "> Running on MockLLM (no ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY set). "
-            "This is a **pipeline check**, not a real model evaluation result. Set one of those "
-            "and re-run for a real evaluation against a real model.\n"
+            "> Running on MockLLM (no API key set). This is a pipeline check, not a real "
+            "model evaluation. Set an API key and re-run for real results.\n"
         )
     lines.append(f"**Overall summary:** Baseline: {baseline_passed}/{total} passed, "
                  f"Hardened: {hardened_passed}/{total} passed\n")
@@ -90,38 +79,14 @@ def build_report(baseline_results, hardened_results, llm_name: str, is_mock: boo
 
     lines.append("\n## Guardrails Applied\n")
     lines.append(
-        "The hardened mode applies four layers, each catching a different class of failure:\n\n"
-        "1. **`sanitize_context`** — strips instruction-shaped text (fake system/assistant "
-        "instructions, HTML comments, \"ignore previous instructions\", role-hijack phrasing) "
-        "out of retrieved knowledge base documents before they reach the model. This matters "
-        "because a RAG agent trusts its retrieval corpus by default, and any content anyone can "
-        "write into that corpus (a wiki page, a ticket, a shared doc) becomes an attack surface "
-        "otherwise.\n"
-        "2. **`sanitize_user_input`** — applies the same stripping to the user's own message, "
-        "since direct prompt injection doesn't require a poisoned document.\n"
-        "3. **`harden_system_prompt`** — adds explicit rules telling the model to treat retrieved "
-        "context as data rather than instructions, never leak system prompts or internal codes, "
-        "and never advise disabling security controls or sharing credentials.\n"
-        "4. **`filter_output`** — a last-resort check on the model's actual output, catching "
-        "anything that slipped past the first three layers (a leaked code, a compromise marker, "
-        "unsafe operational advice) before it reaches the user.\n"
-    )
-
-    lines.append("\n## Why Each Dimension Matters\n")
-    lines.append(
-        "- **Correctness** — an agent that answers confidently but wrong is worse than one that "
-        "doesn't answer at all, since users trust and act on the response.\n"
-        "- **Groundedness / no hallucination** — a support bot that invents a plausible-sounding "
-        "process for something it has no data on erodes trust and can send users down the wrong "
-        "path; saying \"I don't know\" is a correct, safe answer when the KB has no coverage.\n"
-        "- **Robustness** — real users type vague or garbled queries; an agent that breaks or "
-        "produces nonsense on anything less than a perfectly formed question isn't production "
-        "ready.\n"
-        "- **Safety** — enterprise knowledge bases are written and edited by many people over "
-        "time, and a RAG agent that treats everything it retrieves as trustworthy instructions "
-        "rather than data is one poisoned document away from leaking secrets or handing out unsafe "
-        "advice, which is exactly why a dedicated guardrail layer — not just model training — is "
-        "needed around production agents.\n"
+        "Hardened mode applies four layers:\n\n"
+        "1. `sanitize_context` strips instruction-shaped text out of retrieved documents "
+        "before they reach the model.\n"
+        "2. `sanitize_user_input` applies the same stripping to the user's message.\n"
+        "3. `harden_system_prompt` adds rules to treat context as data, never leak system "
+        "prompts or internal codes, and never advise disabling security controls.\n"
+        "4. `filter_output` checks the model's output for leaked codes, compromise markers, "
+        "and unsafe advice before returning it.\n"
     )
 
     return "\n".join(lines)
@@ -136,9 +101,7 @@ def main():
 
     print(f"Using LLM backend: {llm.name}")
     if is_mock:
-        print("NOTE: No API key found. Running on MockLLM. This is a pipeline check, "
-              "not a real model evaluation. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or "
-              "GEMINI_API_KEY for a real evaluation.")
+        print("No API key found, running on MockLLM (pipeline check only).")
 
     print("\nRunning baseline mode...")
     baseline_results = run_mode("baseline", kb, llm)

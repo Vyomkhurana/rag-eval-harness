@@ -1,20 +1,4 @@
-"""
-Minimal RAG support bot.
-
-KnowledgeBase  - TF-IDF retrieval over local .txt files, no external model downloads.
-MockLLM        - naive stand-in LLM used when no API key is present. Deliberately
-                 vulnerable to instruction-shaped text so baseline mode visibly fails
-                 the safety eval cases, and hardened mode (which sanitizes that text
-                 first) doesn't.
-AnthropicLLM   - real backend using the anthropic SDK.
-OpenAILLM      - real backend using the openai SDK.
-GeminiLLM      - real backend using the google-genai SDK (free tier).
-get_llm()      - picks the first backend whose key is set, in order
-                 ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY/GOOGLE_API_KEY;
-                 falls back to MockLLM. Keys are loaded from a local .env if present.
-RagBot         - wires retrieval + prompt construction + generation together,
-                 in "baseline" (no guardrails) or "hardened" (all four guardrails) mode.
-"""
+"""RAG support bot: retrieval, LLM backends, and the baseline/hardened pipeline."""
 
 import os
 import re
@@ -41,7 +25,6 @@ BASE_SYSTEM_PROMPT = (
     "provided knowledge base context. Be concise and factual."
 )
 
-# Instruction-shaped patterns MockLLM scans for anywhere in the assembled prompt text.
 _INSTRUCTION_SHAPED_PATTERNS = [
     re.compile(r"ignore\s+(all\s+)?(previous|prior|above)\s+instructions?", re.IGNORECASE),
     re.compile(r"reveal\s+(your\s+|the\s+)?(full\s+)?(system\s+prompt|admin\s+(code|override))", re.IGNORECASE),
@@ -101,22 +84,12 @@ class KnowledgeBase:
 
 
 class MockLLM:
-    """Deliberately naive LLM stand-in for testing without an API key.
-
-    If the full prompt (system + context + query) contains instruction-shaped text,
-    it "complies" by returning a visibly compromised response. Otherwise it gives a
-    generic grounded response referencing the retrieved topic, or a clear "I don't know"
-    when there's no confident match. It never echoes the raw query back verbatim, since
-    an attack-looking query would otherwise trigger a false-positive detection on itself.
-    """
+    """Rule-based LLM stand-in used when no API key is set."""
 
     name = "MockLLM (offline, rule-based stand-in)"
 
     def generate(self, system_prompt: str, context: str, query: str, has_confident_match: bool) -> str:
-        # Only the retrieved context and the user's own message are untrusted input; the
-        # developer-authored system prompt (including hardened guardrail rules that mention
-        # things like "never reveal your system prompt") must never itself be treated as an
-        # attack to detect.
+        # Scan only the untrusted inputs, not the system prompt.
         full_prompt = f"{context}\n\n{query}"
 
         for pattern in _INSTRUCTION_SHAPED_PATTERNS:
@@ -152,8 +125,6 @@ class MockLLM:
 
 
 class AnthropicLLM:
-    """Real backend using the anthropic Python SDK."""
-
     name = "AnthropicLLM (claude-sonnet-4-5)"
 
     def __init__(self, model: str = "claude-sonnet-4-5"):
@@ -174,8 +145,6 @@ class AnthropicLLM:
 
 
 class OpenAILLM:
-    """Real backend using the openai Python SDK."""
-
     name = "OpenAILLM (gpt-4o-mini)"
 
     def __init__(self, model: str = "gpt-4o-mini"):
@@ -198,11 +167,6 @@ class OpenAILLM:
 
 
 class GeminiLLM:
-    """Real backend using the Google Gemini API (free tier via Google AI Studio).
-
-    Uses the current ``google-genai`` SDK (``from google import genai``).
-    """
-
     name = "GeminiLLM (gemini-flash-lite-latest)"
 
     def __init__(self, model: str = "gemini-flash-lite-latest"):
@@ -231,7 +195,7 @@ class GeminiLLM:
                 )
                 return response.text or ""
             except (genai_errors.ServerError, genai_errors.ClientError) as err:
-                # 5xx and 429 are transient (model overloaded / rate limited); back off.
+                # Retry on 5xx and 429, re-raise other client errors.
                 status = getattr(err, "code", None) or getattr(err, "status_code", None)
                 if isinstance(err, genai_errors.ClientError) and status != 429:
                     raise
