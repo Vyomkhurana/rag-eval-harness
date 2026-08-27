@@ -162,9 +162,35 @@ class AnthropicLLM:
         return "".join(block.text for block in response.content if hasattr(block, "text"))
 
 
+class OpenAILLM:
+    """Real backend using the openai Python SDK."""
+
+    name = "OpenAILLM (gpt-4o-mini)"
+
+    def __init__(self, model: str = "gpt-4o-mini"):
+        import openai
+
+        self.client = openai.OpenAI()
+        self.model = model
+
+    def generate(self, system_prompt: str, context: str, query: str, has_confident_match: bool) -> str:
+        user_message = f"Knowledge base context:\n{context}\n\nQuestion: {query}"
+        response = self.client.chat.completions.create(
+            model=self.model,
+            max_tokens=400,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ],
+        )
+        return response.choices[0].message.content or ""
+
+
 def get_llm():
     if os.environ.get("ANTHROPIC_API_KEY"):
         return AnthropicLLM()
+    if os.environ.get("OPENAI_API_KEY"):
+        return OpenAILLM()
     return MockLLM()
 
 
