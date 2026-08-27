@@ -7,7 +7,11 @@ MockLLM        - naive stand-in LLM used when no API key is present. Deliberatel
                  the safety eval cases, and hardened mode (which sanitizes that text
                  first) doesn't.
 AnthropicLLM   - real backend using the anthropic SDK.
-get_llm()      - picks AnthropicLLM if ANTHROPIC_API_KEY is set, else MockLLM.
+OpenAILLM      - real backend using the openai SDK.
+GeminiLLM      - real backend using the google-genai SDK (free tier).
+get_llm()      - picks the first backend whose key is set, in order
+                 ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY/GOOGLE_API_KEY;
+                 falls back to MockLLM. Keys are loaded from a local .env if present.
 RagBot         - wires retrieval + prompt construction + generation together,
                  in "baseline" (no guardrails) or "hardened" (all four guardrails) mode.
 """
@@ -16,6 +20,13 @@ import os
 import re
 import glob
 from dataclasses import dataclass, field
+
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+except ImportError:
+    pass
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -187,23 +198,46 @@ class OpenAILLM:
 
 
 class GeminiLLM:
-    """Real backend using the Google Gemini API (free tier via Google AI Studio)."""
+    """Real backend using the Google Gemini API (free tier via Google AI Studio).
 
-    name = "GeminiLLM (gemini-2.0-flash)"
+    Uses the current ``google-genai`` SDK (``from google import genai``).
+    """
 
-    def __init__(self, model: str = "gemini-2.0-flash"):
-        import google.generativeai as genai
+    name = "GeminiLLM (gemini-flash-lite-latest)"
+
+    def __init__(self, model: str = "gemini-flash-lite-latest"):
+        from google import genai
 
         api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-        genai.configure(api_key=api_key)
-        self._genai = genai
-        self.model_name = model
+        self.client = genai.Client(api_key=api_key)
+        self.model = model
 
     def generate(self, system_prompt: str, context: str, query: str, has_confident_match: bool) -> str:
-        model = self._genai.GenerativeModel(self.model_name, system_instruction=system_prompt)
+        import time
+
+        from google.genai import types
+        from google.genai import errors as genai_errors
+
         user_message = f"Knowledge base context:\n{context}\n\nQuestion: {query}"
-        response = model.generate_content(user_message)
-        return response.text or ""
+        config = types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            max_output_tokens=2048,
+        )
+        last_err = None
+        for attempt in range(8):
+            try:
+                response = self.client.models.generate_content(
+                    model=self.model, contents=user_message, config=config
+                )
+                return response.text or ""
+            except (genai_errors.ServerError, genai_errors.ClientError) as err:
+                # 5xx and 429 are transient (model overloaded / rate limited); back off.
+                status = getattr(err, "code", None) or getattr(err, "status_code", None)
+                if isinstance(err, genai_errors.ClientError) and status != 429:
+                    raise
+                last_err = err
+                time.sleep(min(2 ** attempt, 30))
+        raise last_err
 
 
 def get_llm():

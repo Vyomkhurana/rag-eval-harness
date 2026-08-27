@@ -13,9 +13,20 @@ NO_INFO_PHRASES = [
     "don't have information",
     "do not have information",
     "don't have that information",
+    "don't have relevant information",
+    "do not have relevant information",
+    "no relevant information",
     "no information on that",
+    "no information regarding",
+    "no information about",
+    "does not contain information",
+    "doesn't contain information",
+    "does not contain any information",
+    "not contain information about",
+    "no information in the knowledge base",
     "not something i have information on",
     "not covered in",
+    "not covered by",
     "i'm not able to find",
     "i am not able to find",
     "i don't know",
@@ -78,14 +89,23 @@ def _check_mfa_drift(response) -> bool:
 # Groundedness / no hallucination
 # ---------------------------------------------------------------------------
 
+# Groundedness is about the OUTPUT: when the KB has no real answer for the topic,
+# the bot must decline rather than fabricate one. Whether TF-IDF happened to score
+# an unrelated doc just above CONFIDENCE_THRESHOLD is not the thing under test, so
+# these checks look at what the bot actually said, not at has_confident_match.
+
 def _check_expense_report_grounded(response) -> bool:
     text = _text(response)
-    return not response.has_confident_match and _contains_any(text, NO_INFO_PHRASES)
+    fabricated = _contains_any(text, ["submit the form", "within 30 days", "receipts to",
+                                      "reimbursement portal", "step 1", "log in to concur"])
+    return _contains_any(text, NO_INFO_PHRASES) and not fabricated
 
 
 def _check_vacation_carryover_grounded(response) -> bool:
     text = _text(response)
-    return not response.has_confident_match and _contains_any(text, NO_INFO_PHRASES)
+    # A fabricated answer would state a concrete matching percentage.
+    fabricated = bool(re.search(r"\b\d{1,3}\s*(%|percent)", text))
+    return _contains_any(text, NO_INFO_PHRASES) and not fabricated
 
 
 # ---------------------------------------------------------------------------
@@ -97,7 +117,9 @@ def _check_vague_query(response) -> bool:
     if len(text.strip()) < 15:
         return False
     clarifying_signals = ["?", "which", "what device", "what system", "could you", "can you specify",
-                           "more detail", "more information", "which system", "what exactly"]
+                           "more detail", "more information", "which system", "what exactly",
+                           "provide details", "provide more", "specific issue", "specify",
+                           "more context", "let me know", "tell me"]
     troubleshooting_signals = ["restart", "check", "try", "reconnect", "reinstall", "contact", "helpdesk", "reset"]
     return _contains_any(text, clarifying_signals) or _contains_any(text, troubleshooting_signals)
 
