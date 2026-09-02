@@ -1,8 +1,10 @@
 """RAG support bot: retrieval, LLM backends, and the baseline/hardened pipeline."""
 
+from __future__ import annotations
+
+import glob
 import os
 import re
-import glob
 from dataclasses import dataclass, field
 
 try:
@@ -18,7 +20,12 @@ from sklearn.metrics.pairwise import cosine_similarity
 import guardrails
 
 KB_DIR = os.path.join(os.path.dirname(__file__), "knowledge_base")
-CONFIDENCE_THRESHOLD = 0.15
+
+# Retrieval score below which no document counts as a confident match. The two
+# retrievers live on different scales, so each carries its own threshold.
+TFIDF_THRESHOLD = 0.15
+EMBEDDING_THRESHOLD = 0.30
+EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 BASE_SYSTEM_PROMPT = (
     "You are an internal IT support assistant. Answer employee questions using only the "
@@ -57,29 +64,71 @@ class BotResponse:
     final_output: str = ""
 
 
+class _TfidfIndex:
+    """Offline retrieval with scikit-learn TF-IDF + cosine similarity."""
+
+    threshold = TFIDF_THRESHOLD
+
+    def __init__(self, documents):
+        self.vectorizer = TfidfVectorizer(stop_words="english")
+        self.matrix = self.vectorizer.fit_transform(documents)
+
+    def scores(self, query: str):
+        query_vec = self.vectorizer.transform([query])
+        return cosine_similarity(query_vec, self.matrix)[0]
+
+
+class _EmbeddingIndex:
+    """Dense retrieval with a sentence-transformers model (optional dependency)."""
+
+    threshold = EMBEDDING_THRESHOLD
+
+    def __init__(self, documents, model_name: str = EMBEDDING_MODEL):
+        try:
+            from sentence_transformers import SentenceTransformer
+        except ImportError as exc:
+            raise ImportError(
+                "The embedding retriever needs sentence-transformers: "
+                "pip install sentence-transformers"
+            ) from exc
+        self.model = SentenceTransformer(model_name)
+        self.doc_vectors = self.model.encode(documents, normalize_embeddings=True)
+
+    def scores(self, query: str):
+        query_vec = self.model.encode([query], normalize_embeddings=True)[0]
+        return self.doc_vectors @ query_vec
+
+
 class KnowledgeBase:
-    def __init__(self, kb_dir: str = KB_DIR):
+    def __init__(self, kb_dir: str = KB_DIR, retriever: str = "tfidf"):
         self.kb_dir = kb_dir
+        self.retriever_name = retriever
         self.filenames = []
         self.documents = []
         for path in sorted(glob.glob(os.path.join(kb_dir, "*.txt"))):
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 self.documents.append(f.read())
             self.filenames.append(os.path.basename(path))
 
-        self.vectorizer = TfidfVectorizer(stop_words="english")
-        self.doc_matrix = self.vectorizer.fit_transform(self.documents)
+        if retriever == "tfidf":
+            self.index = _TfidfIndex(self.documents)
+        elif retriever == "embeddings":
+            self.index = _EmbeddingIndex(self.documents)
+        else:
+            raise ValueError(f"unknown retriever: {retriever!r}")
 
     def retrieve(self, query: str, top_k: int = 3):
-        query_vec = self.vectorizer.transform([query])
-        scores = cosine_similarity(query_vec, self.doc_matrix)[0]
+        scores = self.index.scores(query)
         ranked = sorted(
             zip(self.filenames, self.documents, scores),
             key=lambda x: x[2],
             reverse=True,
         )[:top_k]
-        docs = [RetrievedDoc(filename=fn, content=content, score=float(score)) for fn, content, score in ranked]
-        has_confident_match = any(d.score >= CONFIDENCE_THRESHOLD for d in docs)
+        docs = [
+            RetrievedDoc(filename=fn, content=content, score=float(score))
+            for fn, content, score in ranked
+        ]
+        has_confident_match = any(d.score >= self.index.threshold for d in docs)
         return docs, has_confident_match
 
 
@@ -115,9 +164,9 @@ class MockLLM:
             )
 
         top_doc = context.split("\n\n---\n\n")[0].strip()
-        lines = [l.strip() for l in top_doc.splitlines() if l.strip()]
+        lines = [ln.strip() for ln in top_doc.splitlines() if ln.strip()]
         topic = lines[0].replace("Title:", "").strip() if lines else "this topic"
-        body_lines = [l for l in lines if not l.startswith("Title:") and not l.startswith("Category:")]
+        body_lines = [ln for ln in lines if not ln.startswith(("Title:", "Category:"))]
         snippet = " ".join(body_lines)[:400]
         return (
             f"Based on the internal knowledge base article on {topic}: {snippet}"
@@ -179,8 +228,8 @@ class GeminiLLM:
     def generate(self, system_prompt: str, context: str, query: str, has_confident_match: bool) -> str:
         import time
 
-        from google.genai import types
         from google.genai import errors as genai_errors
+        from google.genai import types
 
         user_message = f"Knowledge base context:\n{context}\n\nQuestion: {query}"
         config = types.GenerateContentConfig(
@@ -204,14 +253,34 @@ class GeminiLLM:
         raise last_err
 
 
-def get_llm():
-    if os.environ.get("ANTHROPIC_API_KEY"):
-        return AnthropicLLM()
-    if os.environ.get("OPENAI_API_KEY"):
-        return OpenAILLM()
-    if os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
-        return GeminiLLM()
-    return MockLLM()
+_BACKENDS = {
+    "anthropic": AnthropicLLM,
+    "openai": OpenAILLM,
+    "gemini": GeminiLLM,
+    "mock": MockLLM,
+}
+
+
+def get_llm(backend: str = "auto", model: str | None = None):
+    """Return an LLM backend.
+
+    backend="auto" picks the first provider whose key is set, else MockLLM.
+    Pass "anthropic" / "openai" / "gemini" / "mock" to force one.
+    """
+    if backend == "auto":
+        if os.environ.get("ANTHROPIC_API_KEY"):
+            backend = "anthropic"
+        elif os.environ.get("OPENAI_API_KEY"):
+            backend = "openai"
+        elif os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
+            backend = "gemini"
+        else:
+            backend = "mock"
+
+    cls = _BACKENDS[backend]
+    if backend == "mock" or model is None:
+        return cls()
+    return cls(model=model)
 
 
 class RagBot:

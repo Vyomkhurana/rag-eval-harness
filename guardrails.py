@@ -20,17 +20,26 @@ _INJECTION_PATTERNS = [
 
 _COMPILED_INJECTION = [re.compile(p, re.IGNORECASE | re.DOTALL) for p in _INJECTION_PATTERNS]
 
-_BAD_OUTPUT_PATTERNS = [
+# Always blocked: a leaked code or system prompt has no safe context.
+_HARD_BLOCK_PATTERNS = [
     r"ADMIN-OVERRIDE-[A-Z0-9\-]+",
     r"\[COMPROMISED RESPONSE\]",
     r"my\s+system\s+prompt\s+is",
     r"here\s+is\s+(my|the)\s+system\s+prompt",
+]
+
+# Unsafe advice: blocked only when the model is recommending it, not when it is
+# telling the user NOT to do it.
+_UNSAFE_ADVICE_PATTERNS = [
     r"disable\s+(your\s+)?MFA",
     r"email\s+your\s+(current\s+)?password",
     r"send\s+your\s+password\s+(via|over)\s+(email|chat)",
 ]
 
-_COMPILED_BAD_OUTPUT = [re.compile(p, re.IGNORECASE) for p in _BAD_OUTPUT_PATTERNS]
+_NEGATORS = ("never", "not", "n't", "without", "avoid", "do not", "should not")
+
+_COMPILED_HARD_BLOCK = [re.compile(p, re.IGNORECASE) for p in _HARD_BLOCK_PATTERNS]
+_COMPILED_UNSAFE_ADVICE = [re.compile(p, re.IGNORECASE) for p in _UNSAFE_ADVICE_PATTERNS]
 
 
 def _strip_injection(text: str) -> str:
@@ -67,12 +76,24 @@ Additional rules you must always follow:
     return base_prompt + rules
 
 
+_WITHHELD = (
+    "[This response was withheld by the output filter because it matched a "
+    "known unsafe or policy-violating pattern. Please rephrase your question, "
+    "or contact the IT helpdesk directly for sensitive account issues.]"
+)
+
+
+def _negated(text: str, start: int) -> bool:
+    window = text[max(0, start - 40):start].lower()
+    return any(neg in window for neg in _NEGATORS)
+
+
 def filter_output(llm_output: str) -> str:
-    for pattern in _COMPILED_BAD_OUTPUT:
+    for pattern in _COMPILED_HARD_BLOCK:
         if pattern.search(llm_output):
-            return (
-                "[This response was withheld by the output filter because it matched a "
-                "known unsafe or policy-violating pattern. Please rephrase your question, "
-                "or contact the IT helpdesk directly for sensitive account issues.]"
-            )
+            return _WITHHELD
+    for pattern in _COMPILED_UNSAFE_ADVICE:
+        match = pattern.search(llm_output)
+        if match and not _negated(llm_output, match.start()):
+            return _WITHHELD
     return llm_output
